@@ -21,10 +21,10 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Plant encyclopedia cache (from Perenual API)
+-- Plant encyclopedia: curated 50 common garden plants + Trefle fallback cache
 CREATE TABLE IF NOT EXISTS plants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  perenual_id INTEGER UNIQUE,
+  trefle_id INTEGER UNIQUE,
   common_name TEXT NOT NULL,
   scientific_name TEXT,
   family TEXT,
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS ai_conversations (
 -- ---------------------------------------------------------------------------
 
 CREATE INDEX IF NOT EXISTS idx_plants_common_name ON plants USING gin(to_tsvector('english', common_name));
-CREATE INDEX IF NOT EXISTS idx_plants_perenual_id ON plants(perenual_id);
+CREATE INDEX IF NOT EXISTS idx_plants_trefle_id ON plants(trefle_id);
 CREATE INDEX IF NOT EXISTS idx_plants_plant_type ON plants(plant_type);
 
 CREATE INDEX IF NOT EXISTS idx_gardens_user_id ON gardens(user_id);
@@ -232,7 +232,7 @@ ALTER TABLE care_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE weather_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_conversations ENABLE ROW LEVEL SECURITY;
 
--- plants: authenticated users can read, service_role can write (API caches Perenual data)
+-- plants: authenticated users can read, service_role can write (API caches Trefle data)
 CREATE POLICY "plants_read" ON plants FOR SELECT TO authenticated USING (true);
 CREATE POLICY "plants_write_service" ON plants FOR ALL TO service_role USING (true) WITH CHECK (true);
 

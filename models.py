@@ -1,6 +1,6 @@
 from typing import Optional, List, Any, Dict
 from datetime import datetime, date
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -29,12 +29,12 @@ class UserProfile(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Plants (Perenual cache)
+# Plants (curated DB + Trefle fallback cache)
 # ---------------------------------------------------------------------------
 
 class PlantSummary(BaseModel):
     id: str
-    perenual_id: Optional[int] = None
+    trefle_id: Optional[int] = None
     common_name: str
     scientific_name: Optional[str] = None
     plant_type: Optional[str] = None
@@ -48,7 +48,7 @@ class PlantSummary(BaseModel):
 
 class PlantDetail(BaseModel):
     id: str
-    perenual_id: Optional[int] = None
+    trefle_id: Optional[int] = None
     common_name: str
     scientific_name: Optional[str] = None
     family: Optional[str] = None
@@ -66,6 +66,11 @@ class PlantDetail(BaseModel):
     harvest_days_max: Optional[int] = None
     companions: List[str] = []
     avoid_near: List[str] = []
+
+    @field_validator("sunlight", "hardiness_zones", "companions", "avoid_near", mode="before")
+    @classmethod
+    def _none_to_empty_list(cls, v):
+        return v if v is not None else []
 
 
 class PlantSearchResponse(BaseModel):

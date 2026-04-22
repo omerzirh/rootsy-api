@@ -7,12 +7,11 @@ from trefle_service import trefle_service
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# In-memory set of trefle IDs already cached — avoids redundant DB checks
-# (stored in perenual_id column for backward compat)
+# In-memory set of Trefle IDs already cached — avoids redundant DB checks.
 _cached_trefle_ids: set[int] = set()
 
 _PLANT_SELECT = (
-    "id,perenual_id,common_name,scientific_name,plant_type,cycle,"
+    "id,trefle_id,common_name,scientific_name,plant_type,cycle,"
     "watering,care_level,image_url,harvest_days_min,harvest_days_max"
 )
 
@@ -27,11 +26,11 @@ def _require_user(request: Request, authorization: Optional[str]) -> str:
 def _cache_plants(sb, plants: list) -> None:
     """Upsert plants from Trefle into the DB, skipping already-known ones."""
     for p in plants:
-        pid = p.get("perenual_id")   # column reused for Trefle ID
+        pid = p.get("trefle_id")
         if pid and pid in _cached_trefle_ids:
             continue
         try:
-            sb.table("plants").upsert(p, on_conflict="perenual_id").execute()
+            sb.table("plants").upsert(p, on_conflict="trefle_id").execute()
             if pid:
                 _cached_trefle_ids.add(pid)
         except Exception as e:

@@ -52,7 +52,6 @@ def _normalize_plant(data: dict) -> dict:
     """Normalize a Trefle plant object to our internal DB shape.
 
     Works for both search results (basic) and detail responses (with main_species).
-    We reuse the perenual_id column to store the Trefle integer ID.
     """
     main = data.get("main_species") or {}
     growth = main.get("growth") or {}
@@ -71,7 +70,7 @@ def _normalize_plant(data: dict) -> dict:
     days = growth.get("days_to_harvest")
 
     return {
-        "perenual_id": data.get("id"),          # reusing column for Trefle ID
+        "trefle_id": data.get("id"),
         "common_name": (data.get("common_name") or "Unknown").title(),
         "scientific_name": data.get("scientific_name"),
         "family": data.get("family"),
