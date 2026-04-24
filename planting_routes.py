@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Header, Request, Query
 from models import (
     CreatePlantingRequest, UpdatePlantingRequest, PlantingItem,
     AddProgressRequest, ProgressEntry,
+    BulkCreatePlantingsRequest, ReorderPlantingsRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,79 @@ async def create_planting(
     return _enrich_planting(sb, result.data[0])
 
 
+@router.post("/bulk", response_model=List[PlantingItem], status_code=201)
+async def bulk_create_plantings(
+    body: BulkCreatePlantingsRequest,
+    request: Request,
+    authorization: Optional[str] = Header(None),
+):
+    """Create multiple individual plantings in a single bed in one call.
+    Each count creates that many rows with quantity=1 so each plant is an
+    independent icon that can be placed and reordered separately.
+    """
+    user_id = _require_user(request, authorization)
+    sb = request.app.state.supabase
+
+    bed = (
+        sb.table("garden_beds")
+        .select("id")
+        .eq("id", body.garden_bed_id)
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not bed.data:
+        raise HTTPException(status_code=404, detail="Garden bed not found")
+
+    # Determine starting position_x (append after existing plants)
+    existing = (
+        sb.table("plantings")
+        .select("position_x")
+        .eq("garden_bed_id", body.garden_bed_id)
+        .execute()
+    )
+    next_index = 0
+    if existing.data:
+        next_index = int(max((p.get("position_x") or 0) for p in existing.data)) + 1
+
+    rows = []
+    for item in body.items:
+        n = max(1, int(item.count or 1))
+        for _ in range(n):
+            rows.append({
+                "user_id": user_id,
+                "garden_bed_id": body.garden_bed_id,
+                "plant_id": item.plant_id,
+                "position_x": next_index,
+                "position_y": 0,
+                "status": body.status,
+                "planted_date": body.planted_date,
+                "quantity": 1,
+                "notes": item.notes,
+            })
+            next_index += 1
+
+    if not rows:
+        return []
+
+    result = sb.table("plantings").insert(rows).execute()
+    return [_enrich_planting(sb, p) for p in (result.data or [])]
+
+
+@router.post("/reorder", status_code=204)
+async def reorder_plantings(
+    body: ReorderPlantingsRequest,
+    request: Request,
+    authorization: Optional[str] = Header(None),
+):
+    """Update position_x (order index) on many plantings at once."""
+    user_id = _require_user(request, authorization)
+    sb = request.app.state.supabase
+
+    for entry in body.entries:
+        sb.table("plantings").update({"position_x": entry.position_x}).eq("id", entry.id).eq("user_id", user_id).execute()
+
+
 @router.get("/", response_model=List[PlantingItem])
 async def list_plantings(
     request: Request,
@@ -88,7 +162,12 @@ async def list_plantings(
     if bed_id:
         query = query.eq("garden_bed_id", bed_id)
 
-    result = query.order("created_at", desc=True).execute()
+    # When scoped to a single bed, order by position_x so drag-reorder sticks.
+    # Globally we fall back to newest-first.
+    if bed_id:
+        result = query.order("position_x").order("created_at").execute()
+    else:
+        result = query.order("created_at", desc=True).execute()
     plantings = result.data or []
 
     return [_enrich_planting(sb, p) for p in plantings]

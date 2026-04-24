@@ -186,6 +186,28 @@ class CreatePlantingRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class BulkPlantingItem(BaseModel):
+    plant_id: str
+    count: int = 1  # how many individual plant instances to create
+    notes: Optional[str] = None
+
+
+class BulkCreatePlantingsRequest(BaseModel):
+    garden_bed_id: str
+    items: List[BulkPlantingItem]
+    status: str = 'seeded'
+    planted_date: Optional[str] = None
+
+
+class ReorderPlantingEntry(BaseModel):
+    id: str
+    position_x: float
+
+
+class ReorderPlantingsRequest(BaseModel):
+    entries: List[ReorderPlantingEntry]
+
+
 class UpdatePlantingRequest(BaseModel):
     status: Optional[str] = None
     planted_date: Optional[str] = None
