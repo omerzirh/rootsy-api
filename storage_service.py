@@ -60,3 +60,13 @@ def plant_photo_key(user_id: str, planting_id: str, filename: str) -> str:
 
 def garden_photo_key(user_id: str, garden_id: str) -> str:
     return f"garden-photos/{user_id}/{garden_id}/background.jpg"
+
+
+def diagnosis_photo_key(user_id: str, filename: str) -> str:
+    return f"plant-diagnoses/{user_id}/{filename}"
+
+
+def put_bytes(object_key: str, body: bytes, content_type: str = "image/jpeg") -> None:
+    """Upload raw bytes directly from the backend."""
+    client = _get_client()
+    client.put_object(Bucket=BUCKET, Key=object_key, Body=body, ContentType=content_type)

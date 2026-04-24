@@ -103,10 +103,6 @@ class WeatherKitService:
         token = self._make_jwt()
         data_sets = "currentWeather,forecastDaily"
         url = f"{self.base_url}/weather/en/{lat}/{lng}"
-        params = {
-            "dataSets": data_sets,
-            "dailyEnd": None,
-        }
         headers = {"Authorization": f"Bearer {token}"}
 
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -119,6 +115,47 @@ class WeatherKitService:
             "longitude": lng,
             "current": self._parse_current(data),
             "daily": self._parse_daily(data)[:days],
+        }
+
+    async def get_weather_with_history(
+        self, lat: float, lng: float, past_days: int = 7, forecast_days: int = 3
+    ) -> Dict[str, Any]:
+        """Fetch current + past N days + forecast in a single WeatherKit call.
+        Uses dailyStart to pull historical daily data alongside the forecast.
+        """
+        from datetime import datetime, timedelta, timezone
+
+        token = self._make_jwt()
+        data_sets = "currentWeather,forecastDaily"
+        url = f"{self.base_url}/weather/en/{lat}/{lng}"
+        headers = {"Authorization": f"Bearer {token}"}
+
+        now = datetime.now(timezone.utc)
+        start = (now - timedelta(days=past_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        end = (now + timedelta(days=forecast_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        params = {
+            "dataSets": data_sets,
+            "dailyStart": start,
+            "dailyEnd": end,
+        }
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, headers=headers, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+
+        today_iso = now.date().isoformat()
+        all_daily = self._parse_daily(data)
+        past = [d for d in all_daily if d.get("date") and d["date"] < today_iso]
+        forecast = [d for d in all_daily if d.get("date") and d["date"] >= today_iso]
+
+        return {
+            "latitude": lat,
+            "longitude": lng,
+            "current": self._parse_current(data),
+            "past_days": past[-past_days:],
+            "forecast_days": forecast[:forecast_days],
         }
 
 

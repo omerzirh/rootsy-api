@@ -373,3 +373,62 @@ class PhotoToMapResponse(BaseModel):
     paths: List[Dict[str, Any]] = []
     confidence: Optional[str] = None
     notes: Optional[str] = None
+
+
+class PlantDiagnosisRequest(BaseModel):
+    image_base64: str
+    image_mime_type: str = 'image/jpeg'
+    plant_name_hint: Optional[str] = None  # user can tell us what it is
+    user_note: Optional[str] = None        # "why am I worried" free text
+    planting_id: Optional[str] = None      # if set, AI gets planting context & history saves to it
+    include_weather: bool = True           # snapshot weather + include in prompt
+
+
+class PlantDiagnosisIssue(BaseModel):
+    label: str                   # e.g. "Nitrogen deficiency", "Powdery mildew"
+    severity: str                # low | medium | high
+    description: Optional[str] = None
+
+
+class PlantDiagnosisAction(BaseModel):
+    title: str
+    detail: Optional[str] = None
+    urgency: str = 'soon'        # now | soon | later
+
+
+class PlantDiagnosisResponse(BaseModel):
+    id: Optional[str] = None                   # DB id if persisted
+    planting_id: Optional[str] = None
+    image_url: Optional[str] = None            # signed URL for viewing (when loading history)
+    identified_as: Optional[str] = None        # best guess of plant species/common name
+    stage: str                                 # seed | seedling | vegetative | flowering | fruiting | mature | dormant | unknown
+    stage_label: Optional[str] = None          # human-friendly, e.g. "True-leaf seedling (2-3 weeks old)"
+    estimated_age: Optional[str] = None        # "~2 weeks", "3-4 weeks"
+    health: str                                # healthy | mild_issues | stressed | diseased | dying | unknown
+    health_score: Optional[int] = None         # 0-100
+    ready_to_transplant: Optional[bool] = None # seedling-specific
+    ready_to_harvest: Optional[bool] = None    # mature-plant-specific
+    issues: List[PlantDiagnosisIssue] = []
+    recommendations: List[PlantDiagnosisAction] = []
+    summary: str                               # one-paragraph human summary
+    confidence: Optional[str] = None           # low | medium | high
+    created_at: Optional[str] = None
+
+    @field_validator("issues", "recommendations", mode="before")
+    @classmethod
+    def _none_to_empty(cls, v):
+        return v if v is not None else []
+
+
+class PlantDiagnosisSummary(BaseModel):
+    """Lightweight row for history lists."""
+    id: str
+    planting_id: Optional[str] = None
+    image_url: Optional[str] = None
+    identified_as: Optional[str] = None
+    stage: Optional[str] = None
+    stage_label: Optional[str] = None
+    health: Optional[str] = None
+    health_score: Optional[int] = None
+    summary: Optional[str] = None
+    created_at: str
